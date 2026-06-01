@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sessionsApi } from '../api/sessions.api';
+import { useAuth } from './AuthContext';
 
 export interface CycleRecord {
   ts: number;      // quando completou (epoch ms)
@@ -22,10 +23,19 @@ const Ctx = createContext<HistoryCtx>({
 const KEY = 'pomodoro.history.v1';
 
 export function HistoryProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [history, setHistory] = useState<CycleRecord[]>([]);
 
-  // Carrega sessões da API; usa AsyncStorage como fallback offline
+  // Re-carrega (ou limpa) sempre que o usuário muda
   useEffect(() => {
+    if (!user) {
+      // Logout ou sem sessão — limpa tudo para o próximo usuário não ver dados antigos
+      setHistory([]);
+      AsyncStorage.removeItem(KEY).catch(() => {});
+      return;
+    }
+
+    // Novo usuário logado — busca histórico dele na API
     (async () => {
       try {
         const sessions = await sessionsApi.getAll();
@@ -36,22 +46,21 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
         setHistory(records);
         AsyncStorage.setItem(KEY, JSON.stringify(records)).catch(() => {});
       } catch {
+        // Offline: tenta o cache local (pode ser de outro usuário, mas é o melhor que temos)
         const raw = await AsyncStorage.getItem(KEY);
         if (raw) setHistory(JSON.parse(raw));
       }
     })();
-  }, []);
+  }, [user?.id]); // dispara apenas quando o ID do usuário muda
 
   const addCycle = useCallback(async (focusMin = 50) => {
     const ts = Date.now();
     const record: CycleRecord = { ts, focusMin };
 
-    // Atualiza estado local imediatamente (optimistic)
     const next = [record, ...history];
     setHistory(next);
     AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
 
-    // Persiste no backend
     try {
       await sessionsApi.create({
         focusMinutes: focusMin,
