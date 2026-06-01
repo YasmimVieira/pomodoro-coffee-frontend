@@ -21,49 +21,78 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
   const { user } = useAuth();
   const { addCycle } = useHistory();
   const pomodoro = usePomodoro();
-  const completedRef = useRef(false); // evita registrar duas vezes
+  const completedRef = useRef(false);
 
-  const { status, phase, elapsed, remaining, fill, running, started } = pomodoro;
+  const {
+    status, phase, phaseIndex,
+    remaining, fill, running, started,
+    waitingForNext,
+  } = pomodoro;
+
   const completed = status === 'COMPLETED';
   const idle      = status === 'IDLE';
+
+  // Próxima fase (usada para títulos e tempo de exibição quando aguardando)
+  const nextPhase = waitingForNext && phaseIndex + 1 < PHASES.length
+    ? PHASES[phaseIndex + 1]
+    : null;
 
   // Registra ciclo e exibe anúncio UMA VEZ ao completar
   useEffect(() => {
     if (completed && !completedRef.current) {
       completedRef.current = true;
-      addCycle(50); // 50 minutos de foco por ciclo
+      addCycle(50);
       cancelAllNotifications();
       setTimeout(() => interstitial.show(), 800);
     }
     if (!completed) completedRef.current = false;
   }, [completed, addCycle]);
 
-  // Re-agenda notificação quando o timer inicia/retoma
+  // Notificações: agenda para o fim da fase quando rodando;
+  // cancela apenas em pausa manual ou idle — não cancela quando waitingForNext
+  // (deixa a notificação agendada disparar naturalmente)
   useEffect(() => {
-    if (!running) {
-      cancelAllNotifications();
+    if (running) {
+      schedulePhaseNotification(remaining, phase.notificationMsg);
       return;
     }
-    schedulePhaseNotification(remaining, PHASES[pomodoro.phaseIndex].notificationMsg);
-  }, [running, pomodoro.phaseIndex, remaining]);
+    if (!waitingForNext) {
+      cancelAllNotifications();
+    }
+  }, [running, waitingForNext, phaseIndex, remaining]);
 
   const handleReset = useCallback(() => {
     cancelAllNotifications();
     pomodoro.reset();
   }, [pomodoro]);
 
-  const title    = idle ? 'Pronto?' : completed ? 'Café pronto!' : phase.label;
+  // Textos da tela
+  const title = idle
+    ? 'Pronto?'
+    : completed
+    ? 'Café pronto!'
+    : waitingForNext
+    ? nextPhase?.type === 'break' ? 'Hora da pausa! ☁️' : 'Hora de focar! 🔥'
+    : phase.label;
+
   const subtitle = idle
     ? 'Toque para iniciar o ciclo de 60 min'
-    : completed ? 'Bom trabalho — aproveite'
+    : completed
+    ? 'Bom trabalho — aproveite'
+    : waitingForNext
+    ? 'Toque play para começar'
     : phase.sub;
+
+  // Quando aguardando próxima fase, exibe a duração dela (ex: 05:00 para pausa)
+  const displayRemaining = waitingForNext && nextPhase
+    ? nextPhase.duration
+    : remaining;
 
   const stateColor =
     phase.type === 'focus' && !idle && !completed
       ? colors.amber
       : colors.muted;
 
-  // Iniciais do nome do usuário para o avatar
   const initials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : 'U';
@@ -84,7 +113,7 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
         </Pressable>
       </View>
 
-      {/* Xícara (ocupa o espaço disponível) */}
+      {/* Xícara */}
       <View style={styles.cup}>
         <CoffeeCup
           fill={fill}
@@ -98,13 +127,13 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
       <TimerDisplay
         title={title}
         subtitle={subtitle}
-        remaining={remaining}
-        idle={idle}
+        remaining={displayRemaining}
+        idle={idle && !waitingForNext}
       />
 
       {/* Barra das 4 fases */}
       <View style={{ marginTop: 20 }}>
-        <PhaseTimeline elapsed={elapsed} />
+        <PhaseTimeline elapsed={pomodoro.totalElapsed} />
       </View>
 
       {/* Controles */}
@@ -113,6 +142,7 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
           started={started}
           running={running}
           completed={completed}
+          waitingForNext={waitingForNext}
           onStart={pomodoro.start}
           onPause={pomodoro.pause}
           onReset={handleReset}

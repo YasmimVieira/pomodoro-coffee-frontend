@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Ícone monocromático (Android 13+) — silhueta branca da xícara -->
+  <g fill="white">
+    <!-- Saucer -->
+    <ellipse cx="512" cy="718" rx="228" ry="30"/>
+    <!-- Corpo da xícara -->
+    <path d="M 342,432 L 682,432
+             L 660,680 Q 657,694 643,696
+             L 381,696 Q 367,694 364,680 Z"/>
+    <ellipse cx="512" cy="432" rx="170" ry="22"/>
+    <!-- Alça -->
+    <path d="M 676,490 Q 796,490 796,564 Q 796,638 676,638"
+          fill="none" stroke="white" stroke-width="56" stroke-linecap="round"/>
+    <!-- Vapor -->
+    <path d="M 452,376 C 440,348 464,320 452,292"
+          fill="none" stroke="white" stroke-width="14" stroke-linecap="round"/>
+    <path d="M 512,364 C 500,336 524,308 512,280"
+          fill="none" stroke="white" stroke-width="14" stroke-linecap="round"/>
+    <path d="M 572,376 C 560,348 584,320 572,292"
+          fill="none" stroke="white" stroke-width="14" stroke-linecap="round"/>
+  </g>
+</svg>

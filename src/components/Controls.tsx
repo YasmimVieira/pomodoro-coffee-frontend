@@ -59,13 +59,14 @@ interface Props {
   started: boolean;
   running: boolean;
   completed: boolean;
+  waitingForNext: boolean;
   onStart: () => void;
   onPause: () => void;
   onReset: () => void;
 }
 
 export function Controls({
-  started, running, completed, onStart, onPause, onReset
+  started, running, completed, waitingForNext, onStart, onPause, onReset
 }: Props) {
 
   // Ciclo completo → só botão de recomeçar
@@ -77,8 +78,8 @@ export function Controls({
     </View>
   );
 
-  // Ainda não iniciou → botão grande de play
-  if (!started) return (
+  // Ainda não iniciou OU aguardando início da próxima fase → botão grande de play
+  if (!started || waitingForNext) return (
     <View style={styles.row}>
       <RoundButton primary size={84} onPress={onStart}>
         {PlayIcon(colors.onAmber)}
