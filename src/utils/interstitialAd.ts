@@ -1,19 +1,22 @@
+import { Platform } from 'react-native';
 import {
   InterstitialAd,
   AdEventType,
   TestIds,
 } from 'react-native-google-mobile-ads';
 
-const unitId = __DEV__
-  ? TestIds.INTERSTITIAL
-  : (process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID ?? TestIds.INTERSTITIAL);
+const prodId = Platform.OS === 'ios'
+  ? process.env.EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_ID
+  : process.env.EXPO_PUBLIC_ADMOB_ANDROID_INTERSTITIAL_ID;
+
+const unitId = __DEV__ ? TestIds.INTERSTITIAL : (prodId ?? TestIds.INTERSTITIAL);
 
 const ad = InterstitialAd.createForAdRequest(unitId, {
   requestNonPersonalizedAdsOnly: true,
 });
 
 // Pré-carrega o próximo anúncio assim que o atual fecha
-ad.addEventListenerOnce(AdEventType.CLOSED, () => {
+ad.addAdEventListener(AdEventType.CLOSED, () => {
   ad.load();
 });
 
@@ -25,7 +28,6 @@ export const interstitial = {
     if (ad.loaded) {
       ad.show();
     } else {
-      // Tenta carregar para a próxima vez
       ad.load();
     }
   },

@@ -20,7 +20,7 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { addCycle } = useHistory();
-  const pomodoro = usePomodoro();
+  const pomodoro = usePomodoro(300); // TESTE — remover antes do build final
   const completedRef = useRef(false);
 
   const {
