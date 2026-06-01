@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { CupMark } from '../components/CoffeeCup';
-// import { AdBanner } from '../components/AdBanner';
+import { AdBanner } from '../components/AdBanner';
 import { useHistory, type CycleRecord } from '../state/HistoryContext';
 import { useAuth } from '../state/AuthContext';
 import { theme } from '../constants/theme';
@@ -105,7 +105,7 @@ export function ProfileScreen({
         showsVerticalScrollIndicator={false}
       >
         {/* Banner de anúncio — NUNCA no timer, só aqui */}
-        {/* <AdBanner /> */}
+        <AdBanner />
 
         {/* Avatar + dados do usuário */}
         <Animated.View

@@ -27,7 +27,13 @@
       "expo-font",
       "expo-secure-store",
       "expo-splash-screen",
-      "expo-build-properties"
+      "expo-build-properties",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-2486523735458313~9562089424"
+        }
+      ]
     ]
   }
 }
