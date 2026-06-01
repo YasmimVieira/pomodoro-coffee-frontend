@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Animated, {
   useSharedValue, useAnimatedStyle,
-  withRepeat, withTiming, withDelay, Easing,
+  withRepeat, withTiming, withDelay, Easing, cancelAnimation,
 } from 'react-native-reanimated';
 
 // Um único fio de fumaça
@@ -15,10 +15,11 @@ function Wisp({ x, delay, dur }: { x: number; delay: number; dur: number }) {
       delay,
       withRepeat(
         withTiming(1, { duration: dur, easing: Easing.inOut(Easing.ease) }),
-        -1,   // repete infinitamente
-        false // sem reverso (sempre de baixo para cima)
+        -1,
+        false
       )
     );
+    return () => cancelAnimation(t);
   }, [t, delay, dur]);
 
   const style = useAnimatedStyle(() => ({

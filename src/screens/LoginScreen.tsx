@@ -61,10 +61,11 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
       }
       onLogin();
     } catch (e: any) {
-      Alert.alert(
-        'Erro',
-        e?.response?.data?.message ?? 'Verifique seus dados e tente novamente.'
-      );
+      const msg =
+        e?.response?.data?.message ??
+        e?.message ??
+        'Verifique seus dados e tente novamente.';
+      Alert.alert('Erro', msg);
     } finally {
       setLoading(false);
     }

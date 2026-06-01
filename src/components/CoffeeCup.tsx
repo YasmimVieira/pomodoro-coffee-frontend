@@ -1,18 +1,11 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, {
   Defs, LinearGradient, Stop, ClipPath,
   Path, Rect, Ellipse, RadialGradient,
 } from 'react-native-svg';
-import Animated, {
-  useSharedValue, useAnimatedProps, withTiming, Easing,
-} from 'react-native-reanimated';
 import { theme } from '../constants/theme';
 import { Steam } from './Steam';
-
-// Permite usar Animated com componentes SVG
-const AnimatedRect    = Animated.createAnimatedComponent(Rect);
-const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
 
 // Geometria: o líquido vai de y=236 (vazio) até y=84 (cheio)
 const TOP   = theme.cup.liquidTop;    // 84
@@ -27,40 +20,15 @@ interface Props {
 }
 
 export function CoffeeCup({ fill, showSteam, completed, idle = false }: Props) {
-  // Valor animado que segue o fill
-  const level = useSharedValue(fill);
-
-  useEffect(() => {
-    // withTiming suaviza o degrau entre ticks de 100ms
-    // O ALVO é sempre o fill exato — sem deriva
-    level.value = withTiming(fill, {
-      duration: 220,
-      easing: Easing.linear,
-    });
-  }, [fill, level]);
-
-  // Props animadas do retângulo de café
-  const liquidProps = useAnimatedProps(() => {
-    const y = BOT - level.value * RANGE;
-    return {
-      y,
-      height: BOT - y + 12, // +12 para cobrir o fundo
-    };
-  });
-
-  // Props animadas da superfície (elipse escura no topo do café)
-  const surfaceProps = useAnimatedProps(() => ({
-    cy: BOT - level.value * RANGE,
-    rx: 50 + level.value * 12,  // elipse alarga conforme enche
-    opacity: level.value > 0.004 ? 0.92 : 0,
-  }));
-
-  // Props animadas da crema (elipse clara acima da superfície)
-  const cremaProps = useAnimatedProps(() => ({
-    cy: BOT - level.value * RANGE - 0.5,
-    rx: 42 + level.value * 12,
-    opacity: level.value > 0.004 ? 0.7 : 0,
-  }));
+  // Calcula as posições SVG direto do fill (atualiza a cada 100ms pelo timer)
+  const liquidY      = BOT - fill * RANGE;
+  const liquidHeight = BOT - liquidY + 12;
+  const surfaceCy    = liquidY;
+  const surfaceRx    = 50 + fill * 12;
+  const surfaceOpacity = fill > 0.004 ? 0.92 : 0;
+  const cremaCy      = liquidY - 0.5;
+  const cremaRx      = 42 + fill * 12;
+  const cremaOpacity = fill > 0.004 ? 0.7 : 0;
 
   const { colors } = theme;
 
@@ -128,29 +96,28 @@ export function CoffeeCup({ fill, showSteam, completed, idle = false }: Props) {
           fill="url(#glass)"
         />
 
-        {/* ── LÍQUIDO ANIMADO ── */}
-        {/* O Rect começa fora do clip e sobe conforme fill aumenta */}
-        <AnimatedRect
+        {/* ── LÍQUIDO ── */}
+        <Rect
           clipPath="url(#cupInner)"
           x={56} width={128}
-          animatedProps={liquidProps}
+          y={liquidY} height={liquidHeight}
           fill="url(#coffee)"
         />
 
         {/* Superfície escura do café */}
-        <AnimatedEllipse
+        <Ellipse
           clipPath="url(#cupInner)"
-          cx={120} ry={6.5}
+          cx={120} cy={surfaceCy} rx={surfaceRx} ry={6.5}
           fill="#9A6438"
-          animatedProps={surfaceProps}
+          opacity={surfaceOpacity}
         />
 
         {/* Crema (espuma clara) */}
-        <AnimatedEllipse
+        <Ellipse
           clipPath="url(#cupInner)"
-          cx={120} ry={3.6}
+          cx={120} cy={cremaCy} rx={cremaRx} ry={3.6}
           fill={colors.crema}
-          animatedProps={cremaProps}
+          opacity={cremaOpacity}
         />
 
         {/* Contorno da xícara */}

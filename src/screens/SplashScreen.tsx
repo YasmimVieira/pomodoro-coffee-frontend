@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeIn,
   useSharedValue, useAnimatedStyle,
-  withRepeat, withTiming, withDelay, withSequence, Easing,
+  withRepeat, withTiming, withDelay, withSequence, cancelAnimation,
 } from 'react-native-reanimated';
 import { theme } from '../constants/theme';
 import { CoffeeCup } from '../components/CoffeeCup';
@@ -26,6 +26,7 @@ function Dot({ i }: { i: number }) {
         -1
       )
     );
+    return () => cancelAnimation(scale);
   }, [scale, i]);
 
   const style = useAnimatedStyle(() => ({

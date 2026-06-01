@@ -21,44 +21,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser]       = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Restaura sessão ao abrir o app
+  // Restaura sessão ao abrir o app a partir do SecureStore
   useEffect(() => {
     (async () => {
       try {
         const token = await SecureStore.getItemAsync('access_token');
-        if (token) {
-          const { data } = await api.get('/auth/me');
-          setUser(data);
+        const raw   = await SecureStore.getItemAsync('user');
+        if (token && raw) {
+          setUser(JSON.parse(raw));
         }
       } catch {
         await SecureStore.deleteItemAsync('access_token');
         await SecureStore.deleteItemAsync('refresh_token');
+        await SecureStore.deleteItemAsync('user');
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  const save = async (access: string, refresh: string) => {
+  const save = async (access: string, refresh: string, userData: User) => {
     await SecureStore.setItemAsync('access_token',  access);
     await SecureStore.setItemAsync('refresh_token', refresh);
+    await SecureStore.setItemAsync('user', JSON.stringify(userData));
   };
 
   const login = useCallback(async (email: string, pw: string) => {
     const { data } = await api.post('/auth/login', { email, password: pw });
-    await save(data.access_token, data.refresh_token);
+    await save(data.access_token, data.refresh_token, data.user);
     setUser(data.user);
   }, []);
 
   const register = useCallback(async (email: string, pw: string, name: string) => {
     const { data } = await api.post('/auth/register', { email, password: pw, name });
-    await save(data.access_token, data.refresh_token);
+    await save(data.access_token, data.refresh_token, data.user);
     setUser(data.user);
   }, []);
 
   const logout = useCallback(async () => {
     await SecureStore.deleteItemAsync('access_token');
     await SecureStore.deleteItemAsync('refresh_token');
+    await SecureStore.deleteItemAsync('user');
     setUser(null);
   }, []);
 
