@@ -5,7 +5,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Rect, Text as SvgText } from 'react-native-svg';
 import { CupMark } from '../components/CoffeeCup';
 import { AdBanner } from '../components/AdBanner';
 import { useHistory, type CycleRecord } from '../state/HistoryContext';
@@ -14,7 +14,8 @@ import { theme } from '../constants/theme';
 
 const { colors } = theme;
 
-// Converte timestamp para texto relativo
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 function relDate(ts: number): string {
   const d   = new Date(ts);
   const now = new Date();
@@ -28,19 +29,103 @@ function relDate(ts: number): string {
   return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} · ${hm}`;
 }
 
-function StatCard({
-  value, unit, label,
-}: { value: React.ReactNode; unit?: string; label: string }) {
+// ── StatCard ──────────────────────────────────────────────────────────────────
+
+function StatCard({ value, unit, label }: { value: React.ReactNode; unit?: string; label: string }) {
   return (
     <View style={styles.statCard}>
       <Text style={styles.statValue}>
-        {value}
-        <Text style={styles.statUnit}>{unit}</Text>
+        {value}<Text style={styles.statUnit}>{unit}</Text>
       </Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
+
+// ── WeeklyChart ───────────────────────────────────────────────────────────────
+
+const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+function WeeklyChart({ history }: { history: CycleRecord[] }) {
+  const days = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const date   = new Date(today.getTime() - (6 - i) * 86400000);
+      const ts     = date.getTime();
+      const mins   = history
+        .filter(h => h.ts >= ts && h.ts < ts + 86400000)
+        .reduce((s, h) => s + h.focusMin, 0);
+      return { label: DAY_LABELS[date.getDay()], mins, isToday: i === 6 };
+    });
+  }, [history]);
+
+  const maxMins  = Math.max(...days.map(d => d.mins), 1);
+  const VW       = 300;
+  const barH_max = 72;
+  const barW     = 28;
+  const gap      = (VW - barW * 7) / 8;
+  const chartH   = 90;
+  const totalH   = chartH + 24;
+
+  return (
+    <View style={styles.chartWrap}>
+      <Text style={styles.section}>ESTA SEMANA</Text>
+      <Svg
+        width="100%"
+        height={totalH}
+        viewBox={`0 0 ${VW} ${totalH}`}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {days.map((d, i) => {
+          const bh  = d.mins > 0 ? Math.max((d.mins / maxMins) * barH_max, 6) : 3;
+          const x   = gap + i * (barW + gap);
+          const y   = chartH - bh;
+          const col = d.isToday
+            ? colors.amber
+            : d.mins > 0
+            ? colors.amberLight
+            : colors.line;
+
+          return (
+            <React.Fragment key={i}>
+              {/* Barra */}
+              <Rect
+                x={x} y={y} width={barW} height={bh}
+                rx={6} fill={col}
+                opacity={d.mins > 0 ? 1 : 0.35}
+              />
+              {/* Minutos acima da barra */}
+              {d.mins > 0 && (
+                <SvgText
+                  x={x + barW / 2} y={y - 5}
+                  textAnchor="middle"
+                  fontSize={8.5}
+                  fill={d.isToday ? colors.amber : colors.cream}
+                  opacity={0.75}
+                >
+                  {d.mins}m
+                </SvgText>
+              )}
+              {/* Rótulo do dia */}
+              <SvgText
+                x={x + barW / 2} y={chartH + 16}
+                textAnchor="middle"
+                fontSize={10}
+                fill={d.isToday ? colors.amber : colors.muted}
+                fontWeight={d.isToday ? '700' : '400'}
+              >
+                {d.label}
+              </SvgText>
+            </React.Fragment>
+          );
+        })}
+      </Svg>
+    </View>
+  );
+}
+
+// ── ProfileScreen ─────────────────────────────────────────────────────────────
 
 export function ProfileScreen({
   onBack, onLogout,
@@ -49,7 +134,6 @@ export function ProfileScreen({
   const { user, logout } = useAuth();
   const { history } = useHistory();
 
-  // Calcula estatísticas (memoizado para não recalcular no scroll)
   const { sessions, hrs, mins, streak } = useMemo(() => {
     const totalMin = history.reduce((a, h) => a + h.focusMin, 0);
     const days = new Set(history.map(h => {
@@ -61,16 +145,13 @@ export function ProfileScreen({
     while (days.has(cur.getTime())) { s++; cur.setTime(cur.getTime() - 86400000); }
     return {
       sessions: history.length,
-      hrs: Math.floor(totalMin / 60),
-      mins: totalMin % 60,
+      hrs:    Math.floor(totalMin / 60),
+      mins:   totalMin % 60,
       streak: s,
     };
   }, [history]);
 
-  const handleLogout = async () => {
-    await logout();
-    onLogout();
-  };
+  const handleLogout = async () => { await logout(); onLogout(); };
 
   const initials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
@@ -104,14 +185,10 @@ export function ProfileScreen({
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 20 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Banner de anúncio — NUNCA no timer, só aqui */}
         <AdBanner />
 
-        {/* Avatar + dados do usuário */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(500)}
-          style={styles.userRow}
-        >
+        {/* Avatar */}
+        <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.userRow}>
           <View style={styles.bigAvatar}>
             <Text style={styles.bigAvatarText}>{initials}</Text>
           </View>
@@ -121,14 +198,16 @@ export function ProfileScreen({
           </View>
         </Animated.View>
 
-        {/* 3 cards de estatísticas */}
-        <Animated.View
-          entering={FadeInDown.delay(200).duration(500)}
-          style={styles.statsRow}
-        >
+        {/* Stats */}
+        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.statsRow}>
           <StatCard value={sessions} label="Ciclos" />
           <StatCard value={hrs} unit={`h${mins ? ' ' + mins + 'm' : ''}`} label="Foco total" />
           <StatCard value={streak} unit="d" label="Sequência" />
+        </Animated.View>
+
+        {/* Gráfico semanal */}
+        <Animated.View entering={FadeInDown.delay(280).duration(500)}>
+          <WeeklyChart history={history} />
         </Animated.View>
 
         {/* Histórico */}
@@ -162,6 +241,8 @@ export function ProfileScreen({
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   nav: {
     flexDirection: 'row', alignItems: 'center',
@@ -182,7 +263,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   bigAvatarText: { color: colors.onAmber, fontSize: 24, fontWeight: '700' },
-  name: { fontSize: 19, fontWeight: '600', color: colors.cream },
+  name:  { fontSize: 19, fontWeight: '600', color: colors.cream },
   email: { fontSize: 13, color: colors.muted },
   statsRow: { flexDirection: 'row', gap: 10, marginTop: 22 },
   statCard: {
@@ -194,8 +275,15 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.mono,
     fontSize: 26, fontWeight: '500', color: colors.cream,
   },
-  statUnit: { fontSize: 13, color: colors.muted },
+  statUnit:  { fontSize: 13, color: colors.muted },
   statLabel: { fontSize: 11.5, color: colors.muted, marginTop: 4 },
+  chartWrap: {
+    backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.line,
+    borderRadius: 18,
+    paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10,
+    marginTop: 14,
+  },
   section: {
     fontFamily: theme.fonts.mono,
     fontSize: 11, letterSpacing: 2, color: colors.muted,
@@ -208,7 +296,7 @@ const styles = StyleSheet.create({
     borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12,
   },
   histTitle: { fontSize: 14.5, fontWeight: '500', color: colors.cream },
-  histDate: { fontSize: 12.5, color: colors.muted, marginTop: 2 },
-  histMin: { fontFamily: theme.fonts.mono, fontSize: 14, color: colors.amber },
-  histFoco: { fontSize: 11, color: colors.muted, marginTop: 2 },
+  histDate:  { fontSize: 12.5, color: colors.muted, marginTop: 2 },
+  histMin:   { fontFamily: theme.fonts.mono, fontSize: 14, color: colors.amber },
+  histFoco:  { fontSize: 11, color: colors.muted, marginTop: 2 },
 });

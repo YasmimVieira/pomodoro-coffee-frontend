@@ -1,72 +1,115 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  View, Text, TextInput, Pressable, StyleSheet,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePomodoro } from '../state/usePomodoro';
 import { useHistory } from '../state/HistoryContext';
 import { useAuth } from '../state/AuthContext';
+import { useSettings } from '../state/SettingsContext';
 import { CoffeeCup } from '../components/CoffeeCup';
 import { TimerDisplay } from '../components/TimerDisplay';
 import { PhaseTimeline } from '../components/PhaseTimeline';
 import { Controls } from '../components/Controls';
+import { SettingsModal } from './SettingsModal';
 import { schedulePhaseNotification, cancelAllNotifications } from '../utils/notifications';
 import { interstitial } from '../utils/interstitialAd';
-import { PHASES } from '../constants/phases';
+import { sendTimerStateToWatch, onWatchAction } from '../utils/watchBridge';
+import { haptics } from '../utils/haptics';
 import { theme } from '../constants/theme';
 
 const { colors } = theme;
 
+const GearIcon = () => (
+  <Svg width={18} height={18} viewBox="0 0 24 24">
+    <Path
+      d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+      fill="none" stroke={colors.muted} strokeWidth={1.6}
+      strokeLinecap="round" strokeLinejoin="round"
+    />
+  </Svg>
+);
+
 export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
-  const insets = useSafeAreaInsets();
+  const insets   = useSafeAreaInsets();
   const { user } = useAuth();
   const { addCycle } = useHistory();
-  const pomodoro = usePomodoro(300); // TESTE — remover antes do build final
+  const { focusMin, breakMin } = useSettings();
+
+  const pomodoro = usePomodoro(1, focusMin * 60, breakMin * 60);
   const completedRef = useRef(false);
+  const prevWaitingRef = useRef(false);
 
   const {
     status, phase, phaseIndex,
     remaining, fill, running, started,
-    waitingForNext,
+    waitingForNext, phases, totalElapsed,
   } = pomodoro;
 
   const completed = status === 'COMPLETED';
   const idle      = status === 'IDLE';
 
-  // Próxima fase (usada para títulos e tempo de exibição quando aguardando)
-  const nextPhase = waitingForNext && phaseIndex + 1 < PHASES.length
-    ? PHASES[phaseIndex + 1]
+  const [focusTask,    setFocusTask]    = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+
+  const nextPhase = waitingForNext && phaseIndex + 1 < phases.length
+    ? phases[phaseIndex + 1]
     : null;
 
-  // Registra ciclo e exibe anúncio UMA VEZ ao completar
+  // Haptics nas transições de fase
+  useEffect(() => {
+    if (waitingForNext && !prevWaitingRef.current) {
+      haptics.heavy(); // fase terminou
+    } else if (!waitingForNext && prevWaitingRef.current && running) {
+      haptics.light(); // nova fase iniciou
+    }
+    prevWaitingRef.current = waitingForNext;
+  }, [waitingForNext, running]);
+
+  useEffect(() => {
+    if (completed) haptics.success();
+  }, [completed]);
+
+  // Registra ciclo ao completar
   useEffect(() => {
     if (completed && !completedRef.current) {
       completedRef.current = true;
-      addCycle(50);
+      addCycle(focusMin * 2);
       cancelAllNotifications();
       setTimeout(() => interstitial.show(), 800);
     }
     if (!completed) completedRef.current = false;
-  }, [completed, addCycle]);
+  }, [completed, addCycle, focusMin]);
 
-  // Notificações: agenda para o fim da fase quando rodando;
-  // cancela apenas em pausa manual ou idle — não cancela quando waitingForNext
-  // (deixa a notificação agendada disparar naturalmente)
+  // Notificações
   useEffect(() => {
     if (running) {
       schedulePhaseNotification(remaining, phase.notificationMsg);
       return;
     }
-    if (!waitingForNext) {
-      cancelAllNotifications();
-    }
+    if (!waitingForNext) cancelAllNotifications();
   }, [running, waitingForNext, phaseIndex, remaining]);
+
+  // Sincroniza com Apple Watch
+  useEffect(() => {
+    sendTimerStateToWatch(pomodoro);
+  }, [pomodoro.running, pomodoro.phaseIndex, pomodoro.remaining, pomodoro.waitingForNext]);
+
+  useEffect(() => {
+    return onWatchAction(action => {
+      if (action === 'start') pomodoro.start();
+      else if (action === 'pause') pomodoro.pause();
+    });
+  }, [pomodoro.start, pomodoro.pause]);
 
   const handleReset = useCallback(() => {
     cancelAllNotifications();
     pomodoro.reset();
   }, [pomodoro]);
 
-  // Textos da tela
+  // Textos
   const title = idle
     ? 'Pronto?'
     : completed
@@ -76,22 +119,30 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
     : phase.label;
 
   const subtitle = idle
-    ? 'Toque para iniciar o ciclo de 60 min'
+    ? focusTask ? `"${focusTask}"` : 'Toque play para iniciar'
     : completed
     ? 'Bom trabalho — aproveite'
     : waitingForNext
     ? 'Toque play para começar'
+    : focusTask
+    ? `"${focusTask}" · ${phase.sub}`
     : phase.sub;
 
-  // Quando aguardando próxima fase, exibe a duração dela (ex: 05:00 para pausa)
   const displayRemaining = waitingForNext && nextPhase
     ? nextPhase.duration
     : remaining;
 
-  const stateColor =
-    phase.type === 'focus' && !idle && !completed
-      ? colors.amber
-      : colors.muted;
+  const stateColor = phase.type === 'focus' && !idle && !completed
+    ? colors.amber : colors.muted;
+
+  const statusLabel: Record<string, string> = {
+    IDLE:      'AGUARDANDO',
+    FOCUS_1:   'FOCO · 1/2',
+    BREAK_1:   'PAUSA · 1/2',
+    FOCUS_2:   'FOCO · 2/2',
+    BREAK_2:   'PAUSA · 2/2',
+    COMPLETED: 'COMPLETO',
+  };
 
   const initials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
@@ -103,14 +154,26 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
       locations={[0, 0.52, 1]}
       style={[styles.fill, { paddingTop: insets.top + 8 }]}
     >
-      {/* Header: chip de estado + avatar */}
+      {/* Header */}
       <View style={styles.header}>
         <View style={[styles.chip, { borderColor: colors.line }]}>
-          <Text style={[styles.chipText, { color: stateColor }]}>{status}</Text>
+          <Text style={[styles.chipText, { color: stateColor }]}>{statusLabel[status] ?? status}</Text>
         </View>
-        <Pressable onPress={onOpenProfile} style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
-        </Pressable>
+
+        <View style={styles.headerRight}>
+          {/* Engrenagem de configurações — só quando idle */}
+          {idle && (
+            <Pressable
+              onPress={() => setShowSettings(true)}
+              style={[styles.iconBtn, { marginRight: 8 }]}
+            >
+              <GearIcon />
+            </Pressable>
+          )}
+          <Pressable onPress={onOpenProfile} style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* Xícara */}
@@ -123,6 +186,19 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
         />
       </View>
 
+      {/* Input de tarefa — só quando idle */}
+      {idle && (
+        <TextInput
+          value={focusTask}
+          onChangeText={setFocusTask}
+          placeholder="Em que você vai focar?"
+          placeholderTextColor={colors.faint ?? colors.muted}
+          style={styles.taskInput}
+          maxLength={60}
+          returnKeyType="done"
+        />
+      )}
+
       {/* Timer */}
       <TimerDisplay
         title={title}
@@ -131,9 +207,9 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
         idle={idle && !waitingForNext}
       />
 
-      {/* Barra das 4 fases */}
+      {/* Barra das fases */}
       <View style={{ marginTop: 20 }}>
-        <PhaseTimeline elapsed={pomodoro.totalElapsed} />
+        <PhaseTimeline elapsed={totalElapsed} phases={phases} />
       </View>
 
       {/* Controles */}
@@ -148,6 +224,11 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
           onReset={handleReset}
         />
       </View>
+
+      <SettingsModal
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
     </LinearGradient>
   );
 }
@@ -159,6 +240,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 22, marginBottom: 4,
   },
+  headerRight: { flexDirection: 'row', alignItems: 'center' },
   chip: {
     borderWidth: 1, borderRadius: 999,
     paddingHorizontal: 14, paddingVertical: 6,
@@ -168,6 +250,12 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.mono,
     fontSize: 11, letterSpacing: 2.5,
   },
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 1, borderColor: colors.line,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(244,236,225,0.03)',
+  },
   avatar: {
     width: 40, height: 40, borderRadius: 20,
     borderWidth: 1, borderColor: colors.line,
@@ -176,4 +264,14 @@ const styles = StyleSheet.create({
   },
   avatarText: { color: colors.amber, fontSize: 15, fontWeight: '600' },
   cup: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  taskInput: {
+    color: colors.cream,
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    marginBottom: 4,
+    opacity: 0.75,
+    minWidth: 200,
+  },
 });

@@ -6,6 +6,7 @@ import * as SplashScreenExpo from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { AuthProvider, useAuth } from './src/state/AuthContext';
 import { HistoryProvider } from './src/state/HistoryContext';
+import { SettingsProvider } from './src/state/SettingsContext';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { TimerScreen } from './src/screens/TimerScreen';
@@ -17,7 +18,7 @@ SplashScreenExpo.preventAutoHideAsync();
 type Screen = 'splash' | 'login' | 'timer' | 'profile';
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
   const [screen, setScreen] = useState<Screen>('splash');
   const [ready, setReady] = useState(false);
 
@@ -67,9 +68,11 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AuthProvider>
-          <HistoryProvider>
-            <AppContent />
-          </HistoryProvider>
+          <SettingsProvider>
+            <HistoryProvider>
+              <AppContent />
+            </HistoryProvider>
+          </SettingsProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

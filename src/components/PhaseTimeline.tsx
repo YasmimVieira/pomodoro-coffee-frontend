@@ -1,35 +1,38 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { PHASES, PHASE_STARTS } from '../constants/phases';
+import { type Phase } from '../constants/phases';
 import { theme } from '../constants/theme';
 
-export function PhaseTimeline({ elapsed }: { elapsed: number }) {
+interface Props {
+  elapsed: number;   // totalElapsed em segundos
+  phases:  Phase[];  // fases dinâmicas vindas do usePomodoro
+}
+
+export function PhaseTimeline({ elapsed, phases }: Props) {
+  // Computa os offsets dinamicamente a partir das fases recebidas
+  const phaseStarts = phases.reduce<number[]>((arr, _, i) =>
+    [...arr, i === 0 ? 0 : arr[i - 1] + phases[i - 1].duration], []);
+
   return (
     <View style={styles.row}>
-      {PHASES.map((phase, i) => {
-        // Quanto desta fase já passou (0 a 1)
+      {phases.map((phase, i) => {
         const progress = Math.min(
           1,
-          Math.max(0, (elapsed - PHASE_STARTS[i]) / phase.duration)
+          Math.max(0, (elapsed - phaseStarts[i]) / phase.duration)
         );
-
         return (
           <View
             key={phase.key}
-            style={[
-              styles.track,
-              { flex: phase.duration }, // proporcional à duração
-            ]}
+            style={[styles.track, { flex: phase.duration }]}
           >
             <View
               style={{
                 height: '100%',
                 width: `${progress * 100}%`,
                 borderRadius: 4,
-                backgroundColor:
-                  phase.type === 'focus'
-                    ? theme.colors.amber              // âmbar para foco
-                    : 'rgba(244,236,225,0.5)',         // branco suave para pausa
+                backgroundColor: phase.type === 'focus'
+                  ? theme.colors.amber
+                  : 'rgba(244,236,225,0.5)',
               }}
             />
           </View>
@@ -42,8 +45,7 @@ export function PhaseTimeline({ elapsed }: { elapsed: number }) {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 5, width: 232 },
   track: {
-    height: 4,
-    borderRadius: 4,
+    height: 4, borderRadius: 4,
     backgroundColor: theme.colors.line,
     overflow: 'hidden',
   },

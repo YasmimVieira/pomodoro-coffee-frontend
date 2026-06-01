@@ -54,6 +54,16 @@ export const PHASES: Phase[] = [
   },
 ];
 
+// Gera as 4 fases com durações customizáveis
+export function buildPhases(focusSec: number, breakSec: number): Phase[] {
+  return [
+    { key: 'FOCUS_1', label: 'Foco',        sub: 'Sessão 1 de 2', duration: focusSec, type: 'focus', notificationMsg: '☁️ Pausa curta! Deixa o café assentar.' },
+    { key: 'BREAK_1', label: 'Pausa curta', sub: 'Respire fundo',  duration: breakSec, type: 'break', notificationMsg: '🔥 Segunda sessão de foco. Vamos lá!' },
+    { key: 'FOCUS_2', label: 'Foco',        sub: 'Sessão 2 de 2', duration: focusSec, type: 'focus', notificationMsg: '☕ Café pronto! Pausa longa merecida.' },
+    { key: 'BREAK_2', label: 'Pausa longa', sub: 'Café pronto',   duration: breakSec, type: 'break', notificationMsg: '🎉 Ciclo completo!' },
+  ];
+}
+
 // Total em segundos: 1500 + 300 + 1500 + 300 = 3600
 export const TOTAL_SECONDS = PHASES.reduce((acc, p) => acc + p.duration, 0);
 

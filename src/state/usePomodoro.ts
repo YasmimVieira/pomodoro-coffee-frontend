@@ -1,33 +1,56 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import {
-  PHASES, PHASE_STARTS,
-  fillForElapsed,
-  type PomodoroStatus, type Phase,
-} from '../constants/phases';
+import { buildPhases, type PomodoroStatus, type Phase } from '../constants/phases';
 
 export interface PomodoroState {
   status: PomodoroStatus;
   phase: Phase;
   phaseIndex: number;
   elapsed: number;         // segundos decorridos na fase atual
-  totalElapsed: number;    // segundos totais acumulados (para fill da xícara)
+  totalElapsed: number;    // segundos totais (para PhaseTimeline e fill)
   remaining: number;       // segundos restantes na fase atual
-  fill: number;            // 0..1
+  fill: number;            // 0..1 — nível do café
   running: boolean;
   started: boolean;
   waitingForNext: boolean; // fase terminou, aguardando usuário iniciar a próxima
+  phases: Phase[];         // fases atuais (para PhaseTimeline)
   start: () => void;
   pause: () => void;
   reset: () => void;
 }
 
-export function usePomodoro(speed = 1): PomodoroState {
-  const bankedMs     = useRef(0);      // ms acumulados na fase atual
-  const segmentStart = useRef(0);      // Date.now() do início do segmento
+// Fill dinâmico baseado no índice e progresso dentro das fases
+function computeFill(phaseIndex: number, elapsedSec: number, phases: Phase[]): number {
+  const focusPhases = phases.filter(p => p.type === 'focus').length; // 2
+  const fillPerFocus = 1 / focusPhases; // 0.5
+
+  const completedFocus = phases.slice(0, phaseIndex).filter(p => p.type === 'focus').length;
+
+  if (phases[phaseIndex]?.type === 'break') {
+    return completedFocus * fillPerFocus;
+  }
+  const progress = Math.min(1, elapsedSec / (phases[phaseIndex]?.duration ?? 1));
+  return completedFocus * fillPerFocus + progress * fillPerFocus;
+}
+
+export function usePomodoro(
+  speed    = 1,
+  focusSec = 25 * 60,
+  breakSec = 5  * 60,
+): PomodoroState {
+  const bankedMs     = useRef(0);
+  const segmentStart = useRef(0);
   const runningRef   = useRef(false);
   const speedRef     = useRef(speed);
   speedRef.current   = speed;
+
+  // Fases e offsets computados a partir das durações
+  const phases = useMemo(() => buildPhases(focusSec, breakSec), [focusSec, breakSec]);
+  const phaseStarts = useMemo(
+    () => phases.reduce<number[]>((arr, _, i) =>
+      [...arr, i === 0 ? 0 : arr[i - 1] + phases[i - 1].duration], []),
+    [phases],
+  );
 
   const [phaseIndex,     setPhaseIndex]     = useState(0);
   const [running,        setRunning]        = useState(false);
@@ -36,10 +59,9 @@ export function usePomodoro(speed = 1): PomodoroState {
   const [isCompleted,    setIsCompleted]    = useState(false);
   const [,               force]             = useState(0);
 
-  const phase           = PHASES[Math.min(phaseIndex, PHASES.length - 1)];
+  const phase           = phases[Math.min(phaseIndex, phases.length - 1)];
   const phaseDurationMs = phase.duration * 1000;
 
-  // Elapsed na fase atual em ms
   const liveElapsedMs = useCallback((): number => {
     const extra = runningRef.current
       ? (Date.now() - segmentStart.current) * speedRef.current
@@ -47,29 +69,25 @@ export function usePomodoro(speed = 1): PomodoroState {
     return Math.min(phaseDurationMs, bankedMs.current + extra);
   }, [phaseDurationMs]);
 
-  // Tick a cada 100ms — para no fim de cada fase
   useEffect(() => {
     const id = setInterval(() => {
       if (!runningRef.current) return;
-
       if (liveElapsedMs() >= phaseDurationMs) {
         bankedMs.current   = phaseDurationMs;
         runningRef.current = false;
         setRunning(false);
-
-        if (phaseIndex >= PHASES.length - 1) {
+        if (phaseIndex >= phases.length - 1) {
           setIsCompleted(true);
         } else {
           setWaitingForNext(true);
         }
       }
-
       force(n => n + 1);
     }, 100);
 
     const sub = AppState.addEventListener('change', () => force(n => n + 1));
     return () => { clearInterval(id); sub.remove(); };
-  }, [liveElapsedMs, phaseDurationMs, phaseIndex]);
+  }, [liveElapsedMs, phaseDurationMs, phaseIndex, phases.length]);
 
   const bank = useCallback(() => {
     bankedMs.current += (Date.now() - segmentStart.current) * speedRef.current;
@@ -77,15 +95,13 @@ export function usePomodoro(speed = 1): PomodoroState {
 
   const start = useCallback(() => {
     if (waitingForNext) {
-      // Avança para próxima fase e inicia
-      bankedMs.current   = 0;
+      bankedMs.current     = 0;
       segmentStart.current = Date.now();
-      runningRef.current = true;
+      runningRef.current   = true;
       setPhaseIndex(i => i + 1);
       setWaitingForNext(false);
       setRunning(true);
     } else {
-      // Inicia ou retoma a fase atual
       segmentStart.current = Date.now();
       runningRef.current   = true;
       setStarted(true);
@@ -111,8 +127,8 @@ export function usePomodoro(speed = 1): PomodoroState {
   }, []);
 
   const elapsedSec   = liveElapsedMs() / 1000;
-  const safeIndex    = Math.min(phaseIndex, PHASES.length - 1);
-  const totalElapsed = PHASE_STARTS[safeIndex] + elapsedSec;
+  const safeIndex    = Math.min(phaseIndex, phases.length - 1);
+  const totalElapsed = phaseStarts[safeIndex] + elapsedSec;
 
   const status: PomodoroStatus = isCompleted
     ? 'COMPLETED'
@@ -127,10 +143,11 @@ export function usePomodoro(speed = 1): PomodoroState {
     elapsed:       elapsedSec,
     totalElapsed,
     remaining:     Math.max(0, phase.duration - elapsedSec),
-    fill:          fillForElapsed(totalElapsed),
+    fill:          computeFill(safeIndex, elapsedSec, phases),
     running,
     started,
     waitingForNext,
+    phases,
     start,
     pause,
     reset,
