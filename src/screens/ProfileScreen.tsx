@@ -8,6 +8,8 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import Svg, { Path, Rect, Text as SvgText } from 'react-native-svg';
 import { CupMark } from '../components/CoffeeCup';
 import { AdBanner } from '../components/AdBanner';
+import { AchievementBadge } from '../components/AchievementBadge';
+import { ACHIEVEMENTS } from '../constants/achievements';
 import { useHistory, type CycleRecord } from '../state/HistoryContext';
 import { useAuth } from '../state/AuthContext';
 import { theme } from '../constants/theme';
@@ -208,6 +210,25 @@ export function ProfileScreen({
         {/* Gráfico semanal */}
         <Animated.View entering={FadeInDown.delay(280).duration(500)}>
           <WeeklyChart history={history} />
+        </Animated.View>
+
+        {/* Conquistas */}
+        <Animated.View entering={FadeInDown.delay(340).duration(500)}>
+          <Text style={styles.section}>CONQUISTAS</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 10, paddingBottom: 4 }}
+          >
+            {ACHIEVEMENTS.map((a, i) => (
+              <AchievementBadge
+                key={a.id}
+                achievement={a}
+                unlocked={sessions >= a.requiredCycles}
+                index={i}
+              />
+            ))}
+          </ScrollView>
         </Animated.View>
 
         {/* Histórico */}
