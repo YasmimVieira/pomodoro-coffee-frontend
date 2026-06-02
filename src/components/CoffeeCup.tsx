@@ -85,7 +85,7 @@ export function CoffeeCup({ fill, showSteam, completed, idle = false }: Props) {
         <Path
           d="M178,108 C 220,104 224,180 176,186"
           fill="none"
-          stroke="rgba(244,236,225,0.22)"
+          stroke="rgba(244,236,225,0.10)"
           strokeWidth={11}
           strokeLinecap="round"
         />
@@ -94,6 +94,7 @@ export function CoffeeCup({ fill, showSteam, completed, idle = false }: Props) {
         <Path
           d="M58,76 L182,76 L169,226 Q165,244 149,244 L91,244 Q75,244 71,226 Z"
           fill="url(#glass)"
+          opacity={0.5}
         />
 
         {/* ── LÍQUIDO ── */}
@@ -124,7 +125,7 @@ export function CoffeeCup({ fill, showSteam, completed, idle = false }: Props) {
         <Path
           d="M58,76 L182,76 L169,226 Q165,244 149,244 L91,244 Q75,244 71,226 Z"
           fill="none"
-          stroke="rgba(244,236,225,0.5)"
+          stroke="rgba(244,236,225,0.18)"
           strokeWidth={2.4}
           strokeLinejoin="round"
         />
@@ -133,7 +134,7 @@ export function CoffeeCup({ fill, showSteam, completed, idle = false }: Props) {
         <Ellipse
           cx={120} cy={78} rx={62} ry={9}
           fill="none"
-          stroke="rgba(244,236,225,0.55)"
+          stroke="rgba(244,236,225,0.20)"
           strokeWidth={2.4}
         />
 

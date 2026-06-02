@@ -4,13 +4,12 @@ import { theme } from '../constants/theme';
 import { formatMMSS } from '../constants/phases';
 
 interface Props {
-  title: string;    // "Foco", "Pausa", "Café pronto!"
-  subtitle: string; // subtítulo abaixo do título
+  title: string;
+  subtitle: string;
   remaining: number;
-  idle: boolean;
 }
 
-export function TimerDisplay({ title, subtitle, remaining, idle }: Props) {
+export function TimerDisplay({ title, subtitle, remaining }: Props) {
   return (
     <View style={styles.wrap}>
       <Text style={styles.title}>{title}</Text>
@@ -18,7 +17,7 @@ export function TimerDisplay({ title, subtitle, remaining, idle }: Props) {
 
       {/* allowFontScaling=false impede o usuário de mudar o tamanho */}
       <Text style={styles.clock} allowFontScaling={false}>
-        {idle ? '25:00' : formatMMSS(remaining)}
+        {formatMMSS(remaining)}
       </Text>
     </View>
   );

@@ -235,7 +235,6 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
         title={title}
         subtitle={subtitle}
         remaining={displayRemaining}
-        idle={idle && !waitingForNext}
       />
 
       {/* Barra das fases */}

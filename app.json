@@ -27,7 +27,17 @@
       "expo-font",
       "expo-secure-store",
       "expo-splash-screen",
-      "expo-build-properties"
+      "expo-build-properties",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#C8894E",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "Pomodoro Coffee"
+        }
+      ]
     ]
   }
 }
