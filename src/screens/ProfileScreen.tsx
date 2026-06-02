@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View, Text, Pressable, StyleSheet, ScrollView,
+  View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,8 @@ import { CupMark } from '../components/CoffeeCup';
 import { AdBanner } from '../components/AdBanner';
 import { AchievementBadge } from '../components/AchievementBadge';
 import { ACHIEVEMENTS } from '../constants/achievements';
+import { rewardedAd } from '../utils/rewardedAd';
+import { generateAndShareWeeklyReport } from '../utils/weeklyReport';
 import { useHistory, type CycleRecord } from '../state/HistoryContext';
 import { useAuth } from '../state/AuthContext';
 import { theme } from '../constants/theme';
@@ -153,7 +155,25 @@ export function ProfileScreen({
     };
   }, [history]);
 
+  const [reportLoading, setReportLoading] = useState(false);
+
   const handleLogout = async () => { await logout(); onLogout(); };
+
+  const handleWatchForReport = () => {
+    setReportLoading(true);
+    rewardedAd.show({
+      onReward: async () => {
+        try {
+          await generateAndShareWeeklyReport(history);
+        } catch {
+          Alert.alert('Erro', 'Não foi possível gerar o relatório.');
+        } finally {
+          setReportLoading(false);
+        }
+      },
+      onClose: () => setReportLoading(false),
+    });
+  };
 
   const initials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
@@ -210,6 +230,26 @@ export function ProfileScreen({
         {/* Gráfico semanal */}
         <Animated.View entering={FadeInDown.delay(280).duration(500)}>
           <WeeklyChart history={history} />
+        </Animated.View>
+
+        {/* Relatório semanal em PDF */}
+        <Animated.View entering={FadeInDown.delay(320).duration(500)} style={styles.reportCard}>
+          <View style={styles.reportLeft}>
+            <Text style={styles.reportTitle}>📊 Relatório Semanal</Text>
+            <Text style={styles.reportSub}>
+              Seus dados da semana em PDF —{'\n'}assista um anúncio para liberar
+            </Text>
+          </View>
+          <Pressable
+            onPress={handleWatchForReport}
+            disabled={reportLoading}
+            style={({ pressed }) => [styles.reportBtn, { opacity: pressed || reportLoading ? 0.7 : 1 }]}
+          >
+            {reportLoading
+              ? <ActivityIndicator size="small" color={colors.onAmber} />
+              : <Text style={styles.reportBtnText}>▶ Assistir</Text>
+            }
+          </Pressable>
         </Animated.View>
 
         {/* Conquistas */}
@@ -320,4 +360,19 @@ const styles = StyleSheet.create({
   histDate:  { fontSize: 12.5, color: colors.muted, marginTop: 2 },
   histMin:   { fontFamily: theme.fonts.mono, fontSize: 14, color: colors.amber },
   histFoco:  { fontSize: 11, color: colors.muted, marginTop: 2 },
+  reportCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.amber + '44',
+    borderRadius: 18, padding: 16, marginTop: 14, gap: 12,
+  },
+  reportLeft:    { flex: 1, gap: 4 },
+  reportTitle:   { fontSize: 15, fontWeight: '600', color: colors.cream },
+  reportSub:     { fontSize: 12, color: colors.muted, lineHeight: 17 },
+  reportBtn: {
+    backgroundColor: colors.amberLight,
+    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10,
+    alignItems: 'center', justifyContent: 'center', minWidth: 88,
+  },
+  reportBtnText: { color: colors.onAmber, fontSize: 13, fontWeight: '700' },
 });
