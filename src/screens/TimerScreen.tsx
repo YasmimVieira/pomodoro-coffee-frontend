@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
+import * as Notifications from 'expo-notifications';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePomodoro } from '../state/usePomodoro';
 import { useHistory } from '../state/HistoryContext';
@@ -13,6 +14,7 @@ import { CoffeeCup } from '../components/CoffeeCup';
 import { TimerDisplay } from '../components/TimerDisplay';
 import { PhaseTimeline } from '../components/PhaseTimeline';
 import { Controls } from '../components/Controls';
+import { CoffeeConfetti } from '../components/CoffeeConfetti';
 import { SettingsModal } from './SettingsModal';
 import { schedulePhaseNotification, cancelAllNotifications } from '../utils/notifications';
 import { interstitial } from '../utils/interstitialAd';
@@ -35,12 +37,16 @@ const GearIcon = () => (
 export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
   const insets   = useSafeAreaInsets();
   const { user } = useAuth();
-  const { addCycle } = useHistory();
+  const { addCycle, newUnlock, clearUnlock } = useHistory();
   const { focusMin, breakMin } = useSettings();
 
-  const pomodoro = usePomodoro(1, focusMin * 60, breakMin * 60);
-  const completedRef = useRef(false);
+  // ← speed=300 para testar conquistas rapidamente; trocar por 1 em produção
+  const pomodoro = usePomodoro(300, focusMin * 60, breakMin * 60);
+  const completedRef   = useRef(false);
   const prevWaitingRef = useRef(false);
+
+  const [showConfetti,    setShowConfetti]    = useState(false);
+  const [toastAchievement, setToastAchievement] = useState<{ name: string; description: string } | null>(null);
 
   const {
     status, phase, phaseIndex,
@@ -57,6 +63,31 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
   const nextPhase = waitingForNext && phaseIndex + 1 < phases.length
     ? phases[phaseIndex + 1]
     : null;
+
+  // Confetti + toast + notificação ao desbloquear conquista
+  useEffect(() => {
+    if (!newUnlock) return;
+
+    setShowConfetti(true);
+    haptics.success();
+
+    // Toast in-app (sempre visível, independe de permissão do sistema)
+    setToastAchievement({ name: newUnlock.name, description: newUnlock.description });
+    const hideToast = setTimeout(() => setToastAchievement(null), 4000);
+
+    // Notificação do sistema (funciona no background / device real)
+    Notifications.scheduleNotificationAsync({
+      content: {
+        title: '🏆 Conquista desbloqueada!',
+        body:  `${newUnlock.name} — ${newUnlock.description}`,
+        sound: true,
+      },
+      trigger: { seconds: 2, channelId: 'pomodoro' } as any,
+    }).catch(() => {});
+
+    clearUnlock();
+    return () => clearTimeout(hideToast);
+  }, [newUnlock, clearUnlock]);
 
   // Haptics nas transições de fase
   useEffect(() => {
@@ -229,6 +260,21 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
         visible={showSettings}
         onClose={() => setShowSettings(false)}
       />
+
+      {/* Chuva de grãos de café */}
+      <CoffeeConfetti
+        visible={showConfetti}
+        onDone={() => setShowConfetti(false)}
+      />
+
+      {/* Toast de conquista (sempre visível no emulador) */}
+      {toastAchievement && (
+        <View style={[styles.toast, { top: insets.top + 60 }]} pointerEvents="none">
+          <Text style={styles.toastTitle}>🏆 Conquista desbloqueada!</Text>
+          <Text style={styles.toastName}>{toastAchievement.name}</Text>
+          <Text style={styles.toastDesc}>{toastAchievement.description}</Text>
+        </View>
+      )}
     </LinearGradient>
   );
 }
@@ -273,5 +319,30 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     opacity: 0.75,
     minWidth: 200,
+  },
+  toast: {
+    position: 'absolute',
+    left: 16, right: 16,
+    backgroundColor: '#1a120b',
+    borderWidth: 1, borderColor: colors.amber + '88',
+    borderRadius: 18,
+    paddingHorizontal: 18, paddingVertical: 14,
+    gap: 4,
+    shadowColor: colors.amber,
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
+  toastTitle: {
+    fontSize: 12, fontWeight: '700',
+    color: colors.amber, letterSpacing: 0.5,
+  },
+  toastName: {
+    fontSize: 16, fontWeight: '700',
+    color: colors.cream,
+  },
+  toastDesc: {
+    fontSize: 12.5, color: colors.muted, lineHeight: 17,
   },
 });
