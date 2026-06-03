@@ -11,9 +11,34 @@ Notifications.setNotificationHandler({
   }),
 });
 
+export async function getPermissionStatus() {
+  const { status } = await Notifications.getPermissionsAsync();
+  return status;
+}
+
 export async function requestPermissions() {
   const { status } = await Notifications.requestPermissionsAsync();
   return status === 'granted';
+}
+
+export async function scheduleRetentionNotification() {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const existing = scheduled.find(n => n.content.data?.type === 'retention');
+  if (existing) await Notifications.cancelScheduledNotificationAsync(existing.identifier);
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: '☕ Sentimos sua falta!',
+      body: 'Seu café está esperando. Que tal um ciclo de foco hoje?',
+      data: { type: 'retention' },
+      sound: true,
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: 2 * 24 * 60 * 60,
+      channelId: 'pomodoro',
+    },
+  });
 }
 
 export async function setupChannel() {

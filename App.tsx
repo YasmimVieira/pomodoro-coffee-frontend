@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -11,7 +12,13 @@ import { SplashScreen } from './src/screens/SplashScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { TimerScreen } from './src/screens/TimerScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
-import { setupChannel, requestPermissions } from './src/utils/notifications';
+import { NotificationPermissionModal } from './src/components/NotificationPermissionModal';
+import {
+  setupChannel,
+  requestPermissions,
+  getPermissionStatus,
+  scheduleRetentionNotification,
+} from './src/utils/notifications';
 
 SplashScreenExpo.preventAutoHideAsync();
 
@@ -21,17 +28,23 @@ function AppContent() {
   const { user } = useAuth();
   const [screen, setScreen] = useState<Screen>('splash');
   const [ready, setReady] = useState(false);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        // Carregue as fontes Geist (baixe de fonts.google.com/specimen/Geist)
         await Font.loadAsync({
           GeistMono: require('./assets/fonts/GeistMono-Regular.ttf'),
           Geist:     require('./assets/fonts/Geist-Regular.ttf'),
         });
         await setupChannel();
-        await requestPermissions();
+
+        const status = await getPermissionStatus();
+        if (status === 'undetermined') {
+          setShowPermissionModal(true);
+        } else if (status === 'granted') {
+          scheduleRetentionNotification();
+        }
       } finally {
         setReady(true);
         SplashScreenExpo.hideAsync();
@@ -39,11 +52,29 @@ function AppContent() {
     })();
   }, []);
 
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'active') scheduleRetentionNotification();
+    });
+    return () => sub.remove();
+  }, []);
+
+  const handleActivateNotifications = async () => {
+    setShowPermissionModal(false);
+    const granted = await requestPermissions();
+    if (granted) scheduleRetentionNotification();
+  };
+
   if (!ready) return null;
 
   return (
     <>
       <StatusBar style="light" />
+      <NotificationPermissionModal
+        visible={showPermissionModal}
+        onActivate={handleActivateNotifications}
+        onDismiss={() => setShowPermissionModal(false)}
+      />
       {screen === 'splash' && (
         <SplashScreen onDone={() => setScreen(user ? 'timer' : 'login')} />
       )}

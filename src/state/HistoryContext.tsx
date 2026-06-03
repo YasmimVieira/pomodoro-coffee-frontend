@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sessionsApi } from '../api/sessions.api';
 import { useAuth } from './AuthContext';
 import { ACHIEVEMENTS, type Achievement } from '../constants/achievements';
+import { updateWidget } from '../utils/widgetData';
 
 export interface CycleRecord {
   ts: number;
@@ -32,6 +33,17 @@ function toRecords(sessions: Awaited<ReturnType<typeof sessionsApi.getAll>>): Cy
   return sessions.map(s => ({ ts: Number(s.completedAt), focusMin: s.focusMinutes }));
 }
 
+function calcStreak(records: CycleRecord[]): number {
+  const days = new Set(records.map(h => {
+    const d = new Date(h.ts);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  }));
+  let s = 0;
+  const cur = new Date(); cur.setHours(0, 0, 0, 0);
+  while (days.has(cur.getTime())) { s++; cur.setTime(cur.getTime() - 86400000); }
+  return s;
+}
+
 export function HistoryProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [history,     setHistory]     = useState<CycleRecord[]>([]);
@@ -57,9 +69,14 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
         setPage(1);
         setHasMore(sessions.length >= PAGE_LIMIT);
         AsyncStorage.setItem(KEY, JSON.stringify(records)).catch(() => {});
+        updateWidget(records.length, calcStreak(records));
       } catch {
         const raw = await AsyncStorage.getItem(KEY);
-        if (raw) setHistory(JSON.parse(raw));
+        if (raw) {
+          const records: CycleRecord[] = JSON.parse(raw);
+          setHistory(records);
+          updateWidget(records.length, calcStreak(records));
+        }
       }
     })();
   }, [user?.id]);
@@ -91,6 +108,7 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
       a => a.requiredCycles <= newCount && a.requiredCycles > prevCount,
     );
     if (unlocked) setNewUnlock(unlocked);
+    updateWidget(newCount, calcStreak(next));
 
     try {
       await sessionsApi.create({ focusMinutes: focusMin, cycles: 1, completedAt: ts });
