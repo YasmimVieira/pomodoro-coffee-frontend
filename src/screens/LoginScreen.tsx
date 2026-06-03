@@ -170,8 +170,6 @@ const styles = StyleSheet.create({
   primary: {
     marginTop: 6, paddingVertical: 16, borderRadius: 16,
     backgroundColor: colors.amberLight, alignItems: 'center',
-    shadowColor: colors.amber, shadowOpacity: 0.3,
-    shadowRadius: 16, shadowOffset: { width: 0, height: 10 }, elevation: 6,
   },
   primaryText: { color: colors.onAmber, fontSize: 16, fontWeight: '600' },
   footer: { fontSize: 13.5, color: colors.muted },

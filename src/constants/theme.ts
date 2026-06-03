@@ -11,9 +11,9 @@ export const theme = {
     line: 'rgba(244,236,225,0.10)',
     card: 'rgba(244,236,225,0.04)',
 
-    amber:      '#E0A766',
-    amberLight: '#EBB877',
-    amberDeep:  '#C98641',
+    amber:      '#a56f40',
+    amberLight: '#a56f40',
+    amberDeep:  '#7d5230',
 
     espressoTop:  '#C98C4F',
     espressoMid:  '#8A5A33',

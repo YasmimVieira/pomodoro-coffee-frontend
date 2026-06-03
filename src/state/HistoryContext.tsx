@@ -10,40 +10,52 @@ export interface CycleRecord {
 }
 
 interface HistoryCtx {
-  history:    CycleRecord[];
-  newUnlock:  Achievement | null;
-  addCycle:   (focusMin?: number) => Promise<void>;
+  history:     CycleRecord[];
+  newUnlock:   Achievement | null;
+  hasMore:     boolean;
+  loadingMore: boolean;
+  addCycle:    (focusMin?: number) => Promise<void>;
+  loadMore:    () => Promise<void>;
   clearUnlock: () => void;
-  clear:      () => void;
+  clear:       () => void;
 }
 
 const Ctx = createContext<HistoryCtx>({
-  history: [], newUnlock: null,
-  addCycle: async () => {}, clearUnlock: () => {}, clear: () => {},
+  history: [], newUnlock: null, hasMore: false, loadingMore: false,
+  addCycle: async () => {}, loadMore: async () => {}, clearUnlock: () => {}, clear: () => {},
 });
 
-const KEY = 'pomodoro.history.v1';
+const KEY        = 'pomodoro.history.v1';
+const PAGE_LIMIT = 10;
+
+function toRecords(sessions: Awaited<ReturnType<typeof sessionsApi.getAll>>): CycleRecord[] {
+  return sessions.map(s => ({ ts: Number(s.completedAt), focusMin: s.focusMinutes }));
+}
 
 export function HistoryProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [history,   setHistory]   = useState<CycleRecord[]>([]);
-  const [newUnlock, setNewUnlock] = useState<Achievement | null>(null);
+  const [history,     setHistory]     = useState<CycleRecord[]>([]);
+  const [newUnlock,   setNewUnlock]   = useState<Achievement | null>(null);
+  const [page,        setPage]        = useState(1);
+  const [hasMore,     setHasMore]     = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  // Recarrega (ou limpa) sempre que o usuário muda
+  // Carrega (ou limpa) sempre que o usuário muda
   useEffect(() => {
     if (!user) {
       setHistory([]);
+      setPage(1);
+      setHasMore(false);
       AsyncStorage.removeItem(KEY).catch(() => {});
       return;
     }
     (async () => {
       try {
-        const sessions = await sessionsApi.getAll();
-        const records: CycleRecord[] = sessions.map(s => ({
-          ts:       Number(s.completedAt),
-          focusMin: s.focusMinutes,
-        }));
+        const sessions = await sessionsApi.getAll(1);
+        const records  = toRecords(sessions);
         setHistory(records);
+        setPage(1);
+        setHasMore(sessions.length >= PAGE_LIMIT);
         AsyncStorage.setItem(KEY, JSON.stringify(records)).catch(() => {});
       } catch {
         const raw = await AsyncStorage.getItem(KEY);
@@ -52,6 +64,20 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
     })();
   }, [user?.id]);
 
+  const loadMore = useCallback(async () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const sessions = await sessionsApi.getAll(nextPage);
+      const records  = toRecords(sessions);
+      setHistory(prev => [...prev, ...records]);
+      setPage(nextPage);
+      setHasMore(sessions.length >= PAGE_LIMIT);
+    } catch {}
+    setLoadingMore(false);
+  }, [hasMore, loadingMore, page]);
+
   const addCycle = useCallback(async (focusMin = 50) => {
     const ts     = Date.now();
     const record = { ts, focusMin };
@@ -59,7 +85,6 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
     setHistory(next);
     AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
 
-    // Detecta se cruzou o threshold de alguma conquista
     const prevCount = history.length;
     const newCount  = next.length;
     const unlocked  = ACHIEVEMENTS.find(
@@ -80,7 +105,7 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ history, newUnlock, addCycle, clearUnlock, clear }}>
+    <Ctx.Provider value={{ history, newUnlock, hasMore, loadingMore, addCycle, loadMore, clearUnlock, clear }}>
       {children}
     </Ctx.Provider>
   );

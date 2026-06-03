@@ -220,17 +220,9 @@ export function ProfileScreen({
           </View>
         </Animated.View>
 
-        {/* Stats */}
-        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.statsRow}>
-          <StatCard value={sessions} label="Ciclos" />
-          <StatCard value={hrs} unit={`h${mins ? ' ' + mins + 'm' : ''}`} label="Foco total" />
-          <StatCard value={streak} unit="d" label="Sequência" />
-        </Animated.View>
+ 
 
-        {/* Gráfico semanal */}
-        <Animated.View entering={FadeInDown.delay(280).duration(500)}>
-          <WeeklyChart history={history} />
-        </Animated.View>
+     
 
         {/* Relatório semanal em PDF */}
         <Animated.View entering={FadeInDown.delay(320).duration(500)} style={styles.reportCard}>

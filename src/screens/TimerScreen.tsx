@@ -327,11 +327,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: 18, paddingVertical: 14,
     gap: 4,
-    shadowColor: colors.amber,
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 10,
   },
   toastTitle: {
     fontSize: 12, fontWeight: '700',

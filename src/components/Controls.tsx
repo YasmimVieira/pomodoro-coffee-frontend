@@ -112,11 +112,6 @@ const styles = StyleSheet.create({
   btn: { alignItems: 'center', justifyContent: 'center' },
   primary: {
     backgroundColor: colors.amberLight,
-    shadowColor: colors.amber,
-    shadowOpacity: 0.34,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
   },
   secondary: {
     backgroundColor: 'rgba(244,236,225,0.04)',

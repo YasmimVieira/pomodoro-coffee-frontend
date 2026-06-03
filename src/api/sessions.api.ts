@@ -18,8 +18,8 @@ export const sessionsApi = {
   create: (body: { focusMinutes: number; cycles: number; completedAt: number }) =>
     api.post<Session>('/sessions', body).then(r => r.data),
 
-  getAll: () =>
-    api.get<Session[]>('/sessions').then(r => r.data),
+  getAll: (page = 1) =>
+    api.get<Session[]>(`/sessions?page=${page}`).then(r => r.data),
 
   getStats: () =>
     api.get<SessionStats>('/sessions/stats').then(r => r.data),
