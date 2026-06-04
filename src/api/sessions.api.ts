@@ -19,7 +19,8 @@ export const sessionsApi = {
     api.post<Session>('/sessions', body).then(r => r.data),
 
   getAll: (page = 1) =>
-    api.get<Session[]>(`/sessions?page=${page}`).then(r => r.data),
+    api.get<{ data: Session[]; total: number; totalPages: number; page: string }>(`/sessions?page=${page}`)
+      .then(r => r.data),
 
   getStats: () =>
     api.get<SessionStats>('/sessions/stats').then(r => r.data),

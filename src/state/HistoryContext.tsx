@@ -26,11 +26,10 @@ const Ctx = createContext<HistoryCtx>({
   addCycle: async () => {}, loadMore: async () => {}, clearUnlock: () => {}, clear: () => {},
 });
 
-const KEY        = 'pomodoro.history.v1';
-const PAGE_LIMIT = 10;
+const cacheKey = (id: string) => `pomodoro.history.v2.${id}`;
 
 function toRecords(sessions: Awaited<ReturnType<typeof sessionsApi.getAll>>): CycleRecord[] {
-  return sessions.map(s => ({ ts: Number(s.completedAt), focusMin: s.focusMinutes }));
+  return (sessions.data ?? []).map(s => ({ ts: Number(s.completedAt), focusMin: s.focusMinutes }));
 }
 
 function calcStreak(records: CycleRecord[]): number {
@@ -52,26 +51,28 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
   const [hasMore,     setHasMore]     = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Carrega (ou limpa) sempre que o usuário muda
   useEffect(() => {
     if (!user) {
       setHistory([]);
       setPage(1);
       setHasMore(false);
-      AsyncStorage.removeItem(KEY).catch(() => {});
       return;
     }
+
+    const key = cacheKey(user.id);
+
     (async () => {
       try {
-        const sessions = await sessionsApi.getAll(1);
-        const records  = toRecords(sessions);
+        const response = await sessionsApi.getAll(1);
+        const records  = toRecords(response);
         setHistory(records);
         setPage(1);
-        setHasMore(sessions.length >= PAGE_LIMIT);
-        AsyncStorage.setItem(KEY, JSON.stringify(records)).catch(() => {});
+        setHasMore(Number(response.totalPages) > 1);
+        AsyncStorage.setItem(key, JSON.stringify(records)).catch(() => {});
         updateWidget(records.length, calcStreak(records));
-      } catch {
-        const raw = await AsyncStorage.getItem(KEY);
+      } catch (e: any) {
+        console.error('[loadHistory] API error:', e?.response?.status, e?.response?.data ?? e?.message);
+        const raw = await AsyncStorage.getItem(key);
         if (raw) {
           const records: CycleRecord[] = JSON.parse(raw);
           setHistory(records);
@@ -82,25 +83,27 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id]);
 
   const loadMore = useCallback(async () => {
-    if (!hasMore || loadingMore) return;
+    if (!hasMore || loadingMore || !user) return;
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const sessions = await sessionsApi.getAll(nextPage);
-      const records  = toRecords(sessions);
+      const response = await sessionsApi.getAll(nextPage);
+      const records  = toRecords(response);
       setHistory(prev => [...prev, ...records]);
       setPage(nextPage);
-      setHasMore(sessions.length >= PAGE_LIMIT);
+      setHasMore(nextPage < Number(response.totalPages));
     } catch {}
     setLoadingMore(false);
-  }, [hasMore, loadingMore, page]);
+  }, [hasMore, loadingMore, page, user]);
 
   const addCycle = useCallback(async (focusMin = 50) => {
+    if (!user) return;
+    const key    = cacheKey(user.id);
     const ts     = Date.now();
     const record = { ts, focusMin };
     const next   = [record, ...history];
     setHistory(next);
-    AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
+    AsyncStorage.setItem(key, JSON.stringify(next)).catch(() => {});
 
     const prevCount = history.length;
     const newCount  = next.length;
@@ -112,15 +115,18 @@ export function HistoryProvider({ children }: { children: React.ReactNode }) {
 
     try {
       await sessionsApi.create({ focusMinutes: focusMin, cycles: 1, completedAt: ts });
-    } catch {}
-  }, [history]);
+    } catch (e: any) {
+      console.error('[addCycle] API error:', e?.response?.status, e?.response?.data ?? e?.message);
+    }
+  }, [history, user]);
 
   const clearUnlock = useCallback(() => setNewUnlock(null), []);
 
   const clear = useCallback(() => {
+    if (!user) return;
     setHistory([]);
-    AsyncStorage.setItem(KEY, JSON.stringify([])).catch(() => {});
-  }, []);
+    AsyncStorage.setItem(cacheKey(user.id), JSON.stringify([])).catch(() => {});
+  }, [user]);
 
   return (
     <Ctx.Provider value={{ history, newUnlock, hasMore, loadingMore, addCycle, loadMore, clearUnlock, clear }}>
