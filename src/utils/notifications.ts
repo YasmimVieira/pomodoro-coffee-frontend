@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import i18n from '../i18n';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -28,8 +29,8 @@ export async function scheduleRetentionNotification() {
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: '☕ Sentimos sua falta!',
-      body: 'Seu café está esperando. Que tal um ciclo de foco hoje?',
+      title: i18n.t('notifications.retentionTitle'),
+      body: i18n.t('notifications.retentionBody'),
       data: { type: 'retention' },
       sound: true,
     },

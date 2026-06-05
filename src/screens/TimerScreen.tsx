@@ -20,6 +20,8 @@ import { schedulePhaseNotification, cancelAllNotifications } from '../utils/noti
 import { interstitial } from '../utils/interstitialAd';
 import { sendTimerStateToWatch, onWatchAction } from '../utils/watchBridge';
 import { haptics } from '../utils/haptics';
+import { useTranslation } from 'react-i18next';
+import { LanguagePicker } from '../components/LanguagePicker';
 import { theme } from '../constants/theme';
 
 const { colors } = theme;
@@ -35,6 +37,7 @@ const GearIcon = () => (
 );
 
 export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
+  const { t } = useTranslation();
   const insets   = useSafeAreaInsets();
   const { user } = useAuth();
   const { addCycle, newUnlock, clearUnlock } = useHistory();
@@ -71,15 +74,16 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
     setShowConfetti(true);
     haptics.success();
 
-    // Toast in-app (sempre visível, independe de permissão do sistema)
-    setToastAchievement({ name: newUnlock.name, description: newUnlock.description });
+    setToastAchievement({
+      name: t(`achievements.${newUnlock.id}.name`),
+      description: t(`achievements.${newUnlock.id}.description`),
+    });
     const hideToast = setTimeout(() => setToastAchievement(null), 4000);
 
-    // Notificação do sistema (funciona no background / device real)
     Notifications.scheduleNotificationAsync({
       content: {
-        title: '🏆 Conquista desbloqueada!',
-        body:  `${newUnlock.name} — ${newUnlock.description}`,
+        title: t('notifications.achievementTitle'),
+        body:  `${t(`achievements.${newUnlock.id}.name`)} — ${t(`achievements.${newUnlock.id}.description`)}`,
         sound: true,
       },
       trigger: { seconds: 2, channelId: 'pomodoro' } as any,
@@ -117,7 +121,7 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
   // Notificações
   useEffect(() => {
     if (running) {
-      schedulePhaseNotification(remaining, phase.notificationMsg);
+      schedulePhaseNotification(remaining, t(`phases.n_${phase.key}`));
       return;
     }
     if (!waitingForNext) cancelAllNotifications();
@@ -142,22 +146,22 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
 
   // Textos
   const title = idle
-    ? 'Pronto?'
+    ? t('timer.ready')
     : completed
-    ? 'Café pronto!'
+    ? t('timer.coffeeReady')
     : waitingForNext
-    ? nextPhase?.type === 'break' ? 'Hora da pausa! ☁️' : 'Hora de focar! 🔥'
-    : phase.label;
+    ? nextPhase?.type === 'break' ? t('timer.breakTime') : t('timer.focusTime')
+    : t(`phases.${phase.key}.label`);
 
   const subtitle = idle
-    ? focusTask ? `"${focusTask}"` : 'Toque play para iniciar'
+    ? focusTask ? `"${focusTask}"` : t('timer.tapToStart')
     : completed
-    ? 'Bom trabalho — aproveite'
+    ? t('timer.goodWork')
     : waitingForNext
-    ? 'Toque play para começar'
+    ? t('timer.tapToBegin')
     : focusTask
-    ? `"${focusTask}" · ${phase.sub}`
-    : phase.sub;
+    ? `"${focusTask}" · ${t(`phases.${phase.key}.sub`)}`
+    : t(`phases.${phase.key}.sub`);
 
   const displayRemaining = waitingForNext && nextPhase
     ? nextPhase.duration
@@ -167,12 +171,12 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
     ? colors.amber : colors.muted;
 
   const statusLabel: Record<string, string> = {
-    IDLE:      'AGUARDANDO',
-    FOCUS_1:   'FOCO · 1/2',
-    BREAK_1:   'PAUSA · 1/2',
-    FOCUS_2:   'FOCO · 2/2',
-    BREAK_2:   'PAUSA · 2/2',
-    COMPLETED: 'COMPLETO',
+    IDLE:      t('timer.status.IDLE'),
+    FOCUS_1:   t('timer.status.FOCUS_1'),
+    BREAK_1:   t('timer.status.BREAK_1'),
+    FOCUS_2:   t('timer.status.FOCUS_2'),
+    BREAK_2:   t('timer.status.BREAK_2'),
+    COMPLETED: t('timer.status.COMPLETED'),
   };
 
   const initials = user?.name
@@ -193,14 +197,14 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
 
         <View style={styles.headerRight}>
           {/* Engrenagem de configurações — só quando idle */}
-          {idle && (
-            <Pressable
-              onPress={() => setShowSettings(true)}
-              style={[styles.iconBtn, { marginRight: 8 }]}
-            >
-              <GearIcon />
-            </Pressable>
-          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 }}>
+            <LanguagePicker />
+            {idle && (
+              <Pressable onPress={() => setShowSettings(true)} style={styles.iconBtn}>
+                <GearIcon />
+              </Pressable>
+            )}
+          </View>
           <Pressable onPress={onOpenProfile} style={styles.avatar}>
             <Text style={styles.avatarText}>{initials}</Text>
           </Pressable>
@@ -222,7 +226,7 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
         <TextInput
           value={focusTask}
           onChangeText={setFocusTask}
-          placeholder="Em que você vai focar?"
+          placeholder={t('timer.focusPlaceholder')}
           placeholderTextColor={colors.faint ?? colors.muted}
           style={styles.taskInput}
           maxLength={60}
@@ -269,7 +273,7 @@ export function TimerScreen({ onOpenProfile }: { onOpenProfile: () => void }) {
       {/* Toast de conquista (sempre visível no emulador) */}
       {toastAchievement && (
         <View style={[styles.toast, { top: insets.top + 60 }]} pointerEvents="none">
-          <Text style={styles.toastTitle}>🏆 Conquista desbloqueada!</Text>
+          <Text style={styles.toastTitle}>{t('timer.achievementUnlocked')}</Text>
           <Text style={styles.toastName}>{toastAchievement.name}</Text>
           <Text style={styles.toastDesc}>{toastAchievement.description}</Text>
         </View>

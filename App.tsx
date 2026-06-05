@@ -1,3 +1,5 @@
+import './src/i18n';
+import { loadSavedLanguage } from './src/i18n';
 import React, { useEffect, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -33,10 +35,13 @@ function AppContent() {
   useEffect(() => {
     (async () => {
       try {
-        await Font.loadAsync({
-          GeistMono: require('./assets/fonts/GeistMono-Regular.ttf'),
-          Geist:     require('./assets/fonts/Geist-Regular.ttf'),
-        });
+        await Promise.all([
+          Font.loadAsync({
+            GeistMono: require('./assets/fonts/GeistMono-Regular.ttf'),
+            Geist:     require('./assets/fonts/Geist-Regular.ttf'),
+          }),
+          loadSavedLanguage(),
+        ]);
         await setupChannel();
 
         const status = await getPermissionStatus();

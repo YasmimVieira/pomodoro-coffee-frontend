@@ -6,13 +6,13 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import { CupMark } from '../components/CoffeeCup';
 import { useAuth } from '../state/AuthContext';
 import { theme } from '../constants/theme';
 
 const { colors } = theme;
 
-// Campo de input reutilizável
 function Field({
   label, value, onChange, secure, placeholder,
 }: {
@@ -33,16 +33,14 @@ function Field({
         autoCapitalize="none"
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        style={[
-          styles.input,
-          { borderColor: focused ? colors.amber : colors.line },
-        ]}
+        style={[styles.input, { borderColor: focused ? colors.amber : colors.line }]}
       />
     </View>
   );
 }
 
 export function LoginScreen({ onLogin }: { onLogin: () => void }) {
+  const { t } = useTranslation();
   const { login, register } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail]   = useState('');
@@ -61,11 +59,8 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
       }
       onLogin();
     } catch (e: any) {
-      const msg =
-        e?.response?.data?.message ??
-        e?.message ??
-        'Verifique seus dados e tente novamente.';
-      Alert.alert('Erro', msg);
+      const msg = e?.response?.data?.message ?? e?.message ?? t('login.checkData');
+      Alert.alert(t('login.error'), msg);
     } finally {
       setLoading(false);
     }
@@ -85,53 +80,36 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View
-            entering={FadeInDown.delay(100).duration(600)}
-            style={styles.brandWrap}
-          >
+          <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.brandWrap}>
             <CupMark size={46} />
             <Text style={styles.title}>
-              {mode === 'login' ? 'Bem-vindo de volta' : 'Criar conta'}
+              {mode === 'login' ? t('login.welcomeBack') : t('login.createAccount')}
             </Text>
             <Text style={styles.sub}>
-              {mode === 'login'
-                ? 'Entre para continuar seu foco'
-                : 'Comece sua jornada de foco'}
+              {mode === 'login' ? t('login.focusContinue') : t('login.focusStart')}
             </Text>
           </Animated.View>
 
-          <Animated.View
-            entering={FadeInDown.delay(250).duration(600)}
-            style={{ gap: 16, marginTop: 34 }}
-          >
+          <Animated.View entering={FadeInDown.delay(250).duration(600)} style={{ gap: 16, marginTop: 34 }}>
             {mode === 'register' && (
-              <Field label="Nome" value={name} onChange={setName} placeholder="Seu nome" />
+              <Field label={t('login.name')} value={name} onChange={setName} placeholder={t('login.namePlaceholder')} />
             )}
-            <Field
-              label="E-mail" value={email} onChange={setEmail}
-              placeholder="voce@email.com"
-            />
-            <Field
-              label="Senha" value={pw} onChange={setPw}
-              secure placeholder="Mínimo 8 caracteres"
-            />
+            <Field label={t('login.email')} value={email} onChange={setEmail} placeholder={t('login.emailPlaceholder')} />
+            <Field label={t('login.password')} value={pw} onChange={setPw} secure placeholder={t('login.passwordPlaceholder')} />
 
             {mode === 'login' && (
-              <Text style={styles.forgot}>Esqueceu a senha?</Text>
+              <Text style={styles.forgot}>{t('login.forgotPassword')}</Text>
             )}
 
             <Pressable
               onPress={handleSubmit}
               disabled={loading}
-              style={({ pressed }) => [
-                styles.primary,
-                { opacity: pressed || loading ? 0.8 : 1 },
-              ]}
+              style={({ pressed }) => [styles.primary, { opacity: pressed || loading ? 0.8 : 1 }]}
             >
               {loading
                 ? <ActivityIndicator color={colors.onAmber} />
                 : <Text style={styles.primaryText}>
-                    {mode === 'login' ? 'Entrar' : 'Criar conta'}
+                    {mode === 'login' ? t('login.enter') : t('login.createAccount')}
                   </Text>
               }
             </Pressable>
@@ -142,9 +120,9 @@ export function LoginScreen({ onLogin }: { onLogin: () => void }) {
             style={{ marginTop: 'auto', paddingTop: 24, alignItems: 'center' }}
           >
             <Text style={styles.footer}>
-              {mode === 'login' ? 'Não tem conta? ' : 'Já tem conta? '}
+              {mode === 'login' ? t('login.noAccount') : t('login.hasAccount')}{' '}
               <Text style={{ color: colors.amber, fontWeight: '600' }}>
-                {mode === 'login' ? 'Criar conta' : 'Entrar'}
+                {mode === 'login' ? t('login.createAccount') : t('login.enter')}
               </Text>
             </Text>
           </Pressable>

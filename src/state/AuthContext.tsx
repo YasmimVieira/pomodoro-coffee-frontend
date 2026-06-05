@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import api from '../api/auth.api';
+import api, { registerForceLogout } from '../api/auth.api';
 
 interface User { id: string; email: string; name: string; }
 
@@ -20,6 +20,11 @@ const Ctx = createContext<AuthCtx>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser]       = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Registra o callback de logout forçado (refresh token expirado)
+  useEffect(() => {
+    registerForceLogout(() => setUser(null));
+  }, []);
 
   // Restaura sessão ao abrir o app a partir do SecureStore
   useEffect(() => {

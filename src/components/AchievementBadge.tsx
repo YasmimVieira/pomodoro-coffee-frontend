@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import { type Achievement } from '../constants/achievements';
 import { theme } from '../constants/theme';
 
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function AchievementBadge({ achievement, unlocked, index = 0, onPress }: Props) {
+  const { t } = useTranslation();
   const iconColor = unlocked ? achievement.color : LOCKED_COLOR;
 
   return (
@@ -32,16 +34,11 @@ export function AchievementBadge({ achievement, unlocked, index = 0, onPress }: 
         </View>
 
         {/* Nome */}
-        <Text
-          style={[styles.name, { color: unlocked ? colors.cream : colors.muted }]}
-          numberOfLines={2}
-        >
-          {achievement.name}
+        <Text style={[styles.name, { color: unlocked ? colors.cream : colors.muted }]} numberOfLines={2}>
+          {t(`achievements.${achievement.id}.name`)}
         </Text>
-
-        {/* Ciclos necessários */}
         <Text style={styles.req}>
-          {achievement.requiredCycles} ciclos
+          {achievement.requiredCycles} {t('profile.cycles_label')}
         </Text>
 
         {/* Cadeado se bloqueado */}

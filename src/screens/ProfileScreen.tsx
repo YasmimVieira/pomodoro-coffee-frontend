@@ -14,6 +14,8 @@ import { rewardedAd } from '../utils/rewardedAd';
 import { generateAndShareWeeklyReport } from '../utils/weeklyReport';
 import { useHistory, type CycleRecord } from '../state/HistoryContext';
 import { useAuth } from '../state/AuthContext';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { theme } from '../constants/theme';
 
 const { colors } = theme;
@@ -26,31 +28,25 @@ function relDate(ts: number): string {
   const day   = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const diff  = Math.round((today - day) / 86400000);
-  const hm    = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  if (diff === 0) return `Hoje · ${hm}`;
-  if (diff === 1) return `Ontem · ${hm}`;
-  if (diff < 7)  return `${d.toLocaleDateString('pt-BR', { weekday: 'long' })} · ${hm}`;
-  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} · ${hm}`;
-}
-
-// ── StatCard ──────────────────────────────────────────────────────────────────
-
-function StatCard({ value, unit, label }: { value: React.ReactNode; unit?: string; label: string }) {
-  return (
-    <View style={styles.statCard}>
-      <Text style={styles.statValue}>
-        {value}<Text style={styles.statUnit}>{unit}</Text>
-      </Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
+  const locale = i18n.language === 'pt' ? 'pt-BR' : i18n.language;
+  const hm    = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  if (diff === 0) return `${i18n.t('profile.today')} · ${hm}`;
+  if (diff === 1) return `${i18n.t('profile.yesterday')} · ${hm}`;
+  if (diff < 7)  return `${d.toLocaleDateString(locale, { weekday: 'long' })} · ${hm}`;
+  return `${d.toLocaleDateString(locale, { day: '2-digit', month: 'short' })} · ${hm}`;
 }
 
 // ── WeeklyChart ───────────────────────────────────────────────────────────────
 
-const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const DAY_LABELS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const DAY_LABELS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_LABELS_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const DAY_LABELS_IT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+const DAY_LABELS_MAP: Record<string, string[]> = { pt: DAY_LABELS_PT, en: DAY_LABELS_EN, es: DAY_LABELS_ES, it: DAY_LABELS_IT };
 
 function WeeklyChart({ history }: { history: CycleRecord[] }) {
+  const { t } = useTranslation();
+  const dayLabels = DAY_LABELS_MAP[i18n.language] ?? DAY_LABELS_PT;
   const days = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -60,7 +56,7 @@ function WeeklyChart({ history }: { history: CycleRecord[] }) {
       const mins   = history
         .filter(h => h.ts >= ts && h.ts < ts + 86400000)
         .reduce((s, h) => s + h.focusMin, 0);
-      return { label: DAY_LABELS[date.getDay()], mins, isToday: i === 6 };
+      return { label: dayLabels[date.getDay()], mins, isToday: i === 6 };
     });
   }, [history]);
 
@@ -74,7 +70,7 @@ function WeeklyChart({ history }: { history: CycleRecord[] }) {
 
   return (
     <View style={styles.chartWrap}>
-      <Text style={styles.section}>ESTA SEMANA</Text>
+      <Text style={styles.section}>{t('profile.thisWeek')}</Text>
       <Svg
         width="100%"
         height={totalH}
@@ -134,26 +130,12 @@ function WeeklyChart({ history }: { history: CycleRecord[] }) {
 export function ProfileScreen({
   onBack, onLogout,
 }: { onBack: () => void; onLogout: () => void }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const { history } = useHistory();
 
-  const { sessions, hrs, mins, streak } = useMemo(() => {
-    const totalMin = history.reduce((a, h) => a + h.focusMin, 0);
-    const days = new Set(history.map(h => {
-      const d = new Date(h.ts);
-      return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    }));
-    let s = 0;
-    const cur = new Date(); cur.setHours(0, 0, 0, 0);
-    while (days.has(cur.getTime())) { s++; cur.setTime(cur.getTime() - 86400000); }
-    return {
-      sessions: history.length,
-      hrs:    Math.floor(totalMin / 60),
-      mins:   totalMin % 60,
-      streak: s,
-    };
-  }, [history]);
+  const sessions = useMemo(() => history.length, [history]);
 
   const [reportLoading, setReportLoading] = useState(false);
 
@@ -166,7 +148,7 @@ export function ProfileScreen({
         try {
           await generateAndShareWeeklyReport(history);
         } catch {
-          Alert.alert('Erro', 'Não foi possível gerar o relatório.');
+          Alert.alert(t('profile.error'), t('profile.report.error'));
         } finally {
           setReportLoading(false);
         }
@@ -193,7 +175,7 @@ export function ProfileScreen({
               strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
           </Svg>
         </Pressable>
-        <Text style={styles.navTitle}>Perfil</Text>
+        <Text style={styles.navTitle}>{t('profile.title')}</Text>
         <Pressable onPress={handleLogout} style={styles.navBtn}>
           <Svg width={18} height={18} viewBox="0 0 18 18">
             <Path d="M7 2H3v14h4M12 5l4 4-4 4M16 9H7" fill="none"
@@ -215,7 +197,7 @@ export function ProfileScreen({
             <Text style={styles.bigAvatarText}>{initials}</Text>
           </View>
           <View>
-            <Text style={styles.name}>{user?.name ?? 'Usuário'}</Text>
+            <Text style={styles.name}>{user?.name ?? t('profile.user')}</Text>
             <Text style={styles.email}>{user?.email}</Text>
           </View>
         </Animated.View>
@@ -227,10 +209,8 @@ export function ProfileScreen({
         {/* Relatório semanal em PDF */}
         <Animated.View entering={FadeInDown.delay(320).duration(500)} style={styles.reportCard}>
           <View style={styles.reportLeft}>
-            <Text style={styles.reportTitle}>📊 Relatório Semanal</Text>
-            <Text style={styles.reportSub}>
-              Seus dados da semana em PDF —{'\n'}assista um anúncio para liberar
-            </Text>
+            <Text style={styles.reportTitle}>{t('profile.report.title')}</Text>
+            <Text style={styles.reportSub}>{t('profile.report.sub')}</Text>
           </View>
           <Pressable
             onPress={handleWatchForReport}
@@ -239,14 +219,14 @@ export function ProfileScreen({
           >
             {reportLoading
               ? <ActivityIndicator size="small" color={colors.onAmber} />
-              : <Text style={styles.reportBtnText}>▶ Assistir</Text>
+              : <Text style={styles.reportBtnText}>{t('profile.report.watch')}</Text>
             }
           </Pressable>
         </Animated.View>
 
         {/* Conquistas */}
         <Animated.View entering={FadeInDown.delay(340).duration(500)}>
-          <Text style={styles.section}>CONQUISTAS</Text>
+          <Text style={styles.section}>{t('profile.achievements')}</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -264,10 +244,10 @@ export function ProfileScreen({
         </Animated.View>
 
         {/* Histórico */}
-        <Text style={styles.section}>HISTÓRICO</Text>
+        <Text style={styles.section}>{t('profile.history')}</Text>
 
         {history.length === 0 && (
-          <Text style={styles.empty}>Nenhum ciclo concluído ainda.</Text>
+          <Text style={styles.empty}>{t('profile.empty')}</Text>
         )}
 
         <View style={{ gap: 9 }}>
@@ -279,12 +259,12 @@ export function ProfileScreen({
             >
               <CupMark size={26} fill={1} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.histTitle}>Ciclo completo</Text>
+                <Text style={styles.histTitle}>{t('profile.cycleComplete')}</Text>
                 <Text style={styles.histDate}>{relDate(h.ts)}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={styles.histMin}>{h.focusMin}m</Text>
-                <Text style={styles.histFoco}>foco</Text>
+                <Text style={styles.histFoco}>{t('profile.focusLabel')}</Text>
               </View>
             </Animated.View>
           ))}
